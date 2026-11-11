@@ -601,6 +601,13 @@ async function startOnDevice(deviceId) {
       lastErr = null;
     } catch (e) {
       lastErr = e;
+      // "Restriction violated": whatever the device is playing (podcast, DJ, Smart Shuffle, an ad…) won't let
+      // us replace it remotely. Pausing it first usually clears that.
+      if (/restriction/i.test(e.message)) {
+        try { await api(`/me/player/pause?device_id=${encodeURIComponent(deviceId)}`, { method: 'PUT' }); } catch { /* may already be paused */ }
+        await wait(800);
+        continue;
+      }
       // "Device not found": the app went to sleep or reconnected with a new id — look it up again by name
       if (/not found/i.test(e.message)) {
         await loadDevices();
@@ -613,6 +620,10 @@ async function startOnDevice(deviceId) {
     throw new Error(`Spotify can't reach ${name || 'that device'} right now — the app is probably asleep. ` +
       (IS_MOBILE ? 'Open the Spotify app and start playing any song (leave it playing), come back here, tap ↻, then Build mix & play.'
                  : 'Open Spotify on it and start playing anything, tap ↻, then try again.'));
+  }
+  if (lastErr && /restriction/i.test(lastErr.message)) {
+    throw new Error(`Spotify won't let the app take over what ${name || 'that device'} is playing right now. ` +
+      'In the Spotify app, switch to a normal song (not a podcast, DJ, or Smart Shuffle), pause it, come back, and tap Build mix & play.');
   }
   if (lastErr) throw lastErr;
   return false;
@@ -635,13 +646,20 @@ async function addMore(n = 10) {
 function setControls(on) { ['prevBtn', 'toggleBtn', 'nextBtn', 'moreBtn'].forEach(id => $(id).disabled = !on); }
 
 async function control(fn) {
-  try { await fn(); setTimeout(pollPlayback, 600); } catch (e) { status('playerStatus', e.message, true); }
+  try { await fn(); setTimeout(pollPlayback, 600); }
+  catch (e) {
+    status('playerStatus', /restriction/i.test(e.message)
+      ? "Spotify didn't allow that right now (for example, it's already paused, or there's nothing to skip to)."
+      : e.message, true);
+    setTimeout(pollPlayback, 600);
+  }
 }
 $('nextBtn').onclick = () => control(() => api('/me/player/next', { method: 'POST' }));
 $('prevBtn').onclick = () => control(() => api('/me/player/previous', { method: 'POST' }));
 $('toggleBtn').onclick = () => control(async () => {
   const s = await api('/me/player');
-  await api(s?.is_playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' });
+  const dev = encodeURIComponent(s?.device?.id || state.deviceId || '');
+  await api(`${s?.is_playing ? '/me/player/pause' : '/me/player/play'}${dev ? '?device_id=' + dev : ''}`, { method: 'PUT' });
 });
 $('moreBtn').onclick = () => addMore(10);
 $('buildBtn').onclick = buildAndPlay;
@@ -706,7 +724,7 @@ $('refreshDevices').onclick = loadDevices;
 // Phone browsers can't play Spotify inside a web page, so on phones we drive the Spotify app instead
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-if (IS_MOBILE) $('deviceHint').textContent = 'Open the Spotify app on this phone and start playing any song (leave it playing — that keeps it awake), come back, tap ↻ and pick your phone.';
+if (IS_MOBILE) $('deviceHint').textContent = 'Open the Spotify app on this phone and play a regular song (not a podcast, DJ, or Smart Shuffle) — that wakes it up. Come back, tap ↻ and pick your phone.';
 
 function loadSdk() {
   if (IS_MOBILE) return;
