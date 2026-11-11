@@ -81,7 +81,7 @@
 <header>
   <div>
     <h1>🚗 Chopped &amp; Shuffled</h1>
-    <p>Everyone picks their genres. The DJ takes turns so everyone gets their songs.</p>
+    <p>Everyone picks their genres and playlists. The DJ takes turns so everyone gets their songs.</p>
   </div>
   <div class="spacer"></div>
   <span id="authPill" class="pill">Not connected</span>
@@ -645,11 +645,10 @@ $('refreshDevices').onclick = loadDevices;
 // Phone browsers can't play Spotify inside a web page, so on phones we drive the Spotify app instead
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
+if (IS_MOBILE) $('deviceHint').textContent = 'Open the Spotify app on this phone (play any song for a second), come back, then tap ↻ and pick it.';
+
 function loadSdk() {
-  if (IS_MOBILE) {
-    $('deviceHint').textContent = 'Open the Spotify app on this phone (play any song for a second), come back, then tap ↻ and pick it.';
-    return;
-  }
+  if (IS_MOBILE) return;
   window.onSpotifyWebPlaybackSDKReady = () => {
     const player = new Spotify.Player({
       name: 'Chopped & Shuffled', volume: 0.8,
