@@ -552,18 +552,70 @@ async function buildAndPlay() {
     renderQueue();
     await extendMix(+$('mixSize').value);
     if (!state.mix.length) throw new Error('No songs found. Try more common genres or a different playlist.');
-    await api(`/me/player/play?device_id=${encodeURIComponent(state.deviceId)}`, {
-      method: 'PUT', body: JSON.stringify({ uris: state.mix.map(t => t.uri) }),
-    });
+    const deviceName = $('deviceSelect').selectedOptions[0]?.textContent.replace(' (active)', '') || 'your device';
+    status('playerStatus', `Starting the mix on ${deviceName}…`);
+    const started = await startOnDevice(state.deviceId);
     state.playingOurMix = true;
     setControls(true);
-    if (state.warning) status('playerStatus', '🎶 Mix is playing. ' + state.warning, true);
-    else status('playerStatus', '🎶 Mix is playing. Enjoy the drive!');
+    setTimeout(pollPlayback, 300);
+    if (!started) {
+      status('playerStatus', `Spotify accepted the mix, but ${deviceName} didn't start playing. ` +
+        (IS_MOBILE ? 'Open the Spotify app, play any song for a second so it wakes up, come back, then tap Build mix & play again.'
+                   : 'Make sure Spotify is open on that device, tap ↻, and try again.'), true);
+      return;
+    }
+    if (state.warning) status('playerStatus', `🎶 Playing on ${deviceName}. ` + state.warning, true);
+    else status('playerStatus', `🎶 Playing on ${deviceName}. Enjoy the drive!`);
     state.warning = null;
-    setTimeout(pollPlayback, 1200);
   } catch (e) {
     status('playerStatus', e.message, true);
   } finally { btn.disabled = false; }
+}
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Is the chosen device actually playing a song from our mix?
+async function isPlayingOurMix(deviceId) {
+  const s = await api('/me/player').catch(() => null);
+  const it = s?.item;
+  // match on id, Spotify's regional "relinked" id, or name, so a relinked track still counts
+  const ours = it && state.mix.some(t => t.id === it.id || t.id === it.linked_from?.id || t.name === it.name);
+  return !!(s?.is_playing && s.device?.id === deviceId && ours);
+}
+
+// Spotify says "OK" even when a sleeping phone app ignores the command, so: hand playback to the
+// device first (wakes it up), start the mix, then check it really started — and retry once if not.
+async function startOnDevice(deviceId) {
+  const uris = state.mix.map(t => t.uri);
+  const name = state.devices?.find(d => d.id === deviceId)?.name;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      try { await api('/me/player', { method: 'PUT', body: JSON.stringify({ device_ids: [deviceId], play: false }) }); } catch { /* best effort */ }
+      await wait(attempt ? 1500 : 700);
+      await api(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, { method: 'PUT', body: JSON.stringify({ uris }) });
+      for (let check = 0; check < 4; check++) {
+        await wait(1000);
+        if (await isPlayingOurMix(deviceId)) return true;
+      }
+      lastErr = null;
+    } catch (e) {
+      lastErr = e;
+      // "Device not found": the app went to sleep or reconnected with a new id — look it up again by name
+      if (/not found/i.test(e.message)) {
+        await loadDevices();
+        const again = state.devices?.find(d => d.name === name);
+        if (again) { deviceId = state.deviceId = again.id; $('deviceSelect').value = again.id; }
+      }
+    }
+  }
+  if (lastErr && /not found/i.test(lastErr.message)) {
+    throw new Error(`Spotify can't reach ${name || 'that device'} right now — the app is probably asleep. ` +
+      (IS_MOBILE ? 'Open the Spotify app and start playing any song (leave it playing), come back here, tap ↻, then Build mix & play.'
+                 : 'Open Spotify on it and start playing anything, tap ↻, then try again.'));
+  }
+  if (lastErr) throw lastErr;
+  return false;
 }
 
 async function addMore(n = 10) {
@@ -632,9 +684,18 @@ async function loadDevices() {
       sel.innerHTML = '<option value="">No devices — open Spotify on a phone/computer, then ↻</option>';
       state.deviceId = null; return;
     }
-    const preferred = state.deviceId || devices.find(d => d.is_active)?.id || state.sdkDeviceId || devices[0].id;
+    state.devices = devices;
+    const stillThere = devices.some(d => d.id === state.deviceId) ? state.deviceId : null;
+    // On a phone, default to the phone's own Spotify app rather than whatever was last active (e.g. the computer)
+    const phone = IS_MOBILE ? devices.find(d => d.type === 'Smartphone') : null;
+    const preferred = stillThere || phone?.id || state.sdkDeviceId || devices.find(d => d.is_active)?.id || devices[0].id;
+    const label = (d) => {
+      if (d.id === state.sdkDeviceId) return '💻 This browser';
+      if (d.name === 'Chopped & Shuffled') return '💻 Chopped & Shuffled (a computer browser)';
+      return (d.type === 'Smartphone' ? '📱 ' : d.type === 'Computer' ? '💻 ' : '🔊 ') + esc(d.name);
+    };
     sel.innerHTML = devices.map(d =>
-      `<option value="${esc(d.id)}" ${d.id === preferred ? 'selected' : ''}>${d.id === state.sdkDeviceId ? '💻 This browser' : (d.type === 'Smartphone' ? '📱 ' : '🔊 ') + esc(d.name)}${d.is_active ? ' (active)' : ''}</option>`
+      `<option value="${esc(d.id)}" ${d.id === preferred ? 'selected' : ''}>${label(d)}${d.is_active ? ' (active)' : ''}</option>`
     ).join('');
     state.deviceId = sel.value;
   } catch (e) { status('playerStatus', e.message, true); }
@@ -645,7 +706,7 @@ $('refreshDevices').onclick = loadDevices;
 // Phone browsers can't play Spotify inside a web page, so on phones we drive the Spotify app instead
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-if (IS_MOBILE) $('deviceHint').textContent = 'Open the Spotify app on this phone (play any song for a second), come back, then tap ↻ and pick it.';
+if (IS_MOBILE) $('deviceHint').textContent = 'Open the Spotify app on this phone and start playing any song (leave it playing — that keeps it awake), come back, tap ↻ and pick your phone.';
 
 function loadSdk() {
   if (IS_MOBILE) return;
