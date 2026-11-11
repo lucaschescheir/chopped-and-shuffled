@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chopped &amp; Shuffled</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #20242d; --text: #eef0f4; --muted: #9aa3b2;
+    --accent: #1db954; --accent2: #ffb547; --danger: #ff5d5d; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 10% -10%, #1d2a22 0%, transparent 60%), var(--bg);
+    color: var(--text); min-height: 100vh;
+  }
+  header { padding: 28px 20px 8px; max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+  header p { margin: 0; color: var(--muted); }
+  .spacer { flex: 1; }
+  main { max-width: 1100px; margin: 0 auto; padding: 12px 20px 60px; display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid #262a33; border-radius: var(--radius); padding: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .full { grid-column: 1 / -1; }
+  .muted { color: var(--muted); font-size: 14px; }
+  input, select {
+    background: var(--panel2); color: var(--text); border: 1px solid #333846; border-radius: 10px;
+    padding: 10px 12px; font-size: 16px; outline: none; min-width: 0; /* 16px stops iPhone zooming in */
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid #333846; border-radius: 10px;
+    padding: 10px 14px; font-size: 15px; cursor: pointer; font-weight: 600;
+  }
+  button:hover:not(:disabled) { border-color: #4a5163; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: #04140a; border-color: var(--accent); }
+  button.ghost { background: transparent; }
+  button.small { padding: 5px 9px; font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row > input { flex: 1; }
+  code { background: var(--panel2); padding: 2px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
+  ol.steps { margin: 6px 0 12px; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .passenger { background: var(--panel2); border-radius: 12px; padding: 12px; margin-top: 10px; border-left: 4px solid var(--pc); }
+  .passenger .top { display: flex; align-items: center; gap: 8px; }
+  .passenger .name { font-weight: 700; flex: 1; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chip { background: #2b303b; border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+  .chip button { background: none; border: none; padding: 0 4px; color: var(--muted); font-size: 14px; }
+  .chip button:hover { color: var(--danger); }
+  .chip.pl { background: #233a2c; }
+  .pl-pick { width: 100%; margin-top: 8px; font-size: 14px; padding: 8px 10px; }
+  .pick-note { margin: 8px 0 0; font-size: 13px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); display: inline-block; flex: none; }
+  .now { display: flex; gap: 14px; align-items: center; background: var(--panel2); border-radius: 12px; padding: 12px; min-height: 88px; }
+  .now img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #2b303b; }
+  .now .title { font-weight: 700; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #2b303b; margin-top: 6px; }
+  .controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .queue { list-style: none; padding: 0; margin: 0; max-height: 520px; overflow: auto; }
+  .queue li { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 10px; }
+  .queue li.playing { background: #1f3326; }
+  .queue li.played { opacity: .45; }
+  .queue img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #2b303b; }
+  .queue .meta { flex: 1; min-width: 0; }
+  .queue .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-size: 14px; }
+  .queue .a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 13px; }
+  .who { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .fair { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .fair span { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+  .status { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 18px; }
+  .status.err { color: var(--danger); }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--panel2); color: var(--muted); }
+  .pill.ok { color: var(--accent); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🚗 Chopped &amp; Shuffled</h1>
+    <p>Everyone picks their genres. The DJ takes turns so everyone gets their songs.</p>
+  </div>
+  <div class="spacer"></div>
+  <span id="authPill" class="pill">Not connected</span>
+  <button id="logoutBtn" class="ghost small hidden">Disconnect</button>
+</header>
+
+<main>
+  <!-- Spotify setup -->
+  <section class="card full" id="setupCard">
+    <h2>🔌 Connect Spotify</h2>
+    <ol class="steps" id="setupSteps">
+      <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--accent)">developer.spotify.com/dashboard</a> and create an app (choose <b>Web API</b> and <b>Web Playback SDK</b>).</li>
+      <li>Add this exact Redirect URI in the app settings: <code id="redirectUri"></code></li>
+      <li>Under <b>User Management</b>, add the Spotify account(s) that will log in.</li>
+      <li>Paste the app's <b>Client ID</b> below and connect. Playback requires Spotify Premium.</li>
+    </ol>
+    <div class="row">
+      <input id="clientId" placeholder="Spotify Client ID" autocomplete="off" spellcheck="false">
+      <button id="loginBtn" class="primary">Connect Spotify</button>
+    </div>
+    <div class="status" id="setupStatus"></div>
+  </section>
+
+  <!-- Passengers -->
+  <section class="card">
+    <h2>🧑‍🤝‍🧑 Passengers</h2>
+    <form id="addPassengerForm" class="row">
+      <input id="passengerName" placeholder="Name (e.g. Sam)" maxlength="30" autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
+    <div id="passengers"></div>
+    <p class="muted" id="noPassengers">Add everyone in the car, then give each person a few genres.</p>
+    <datalist id="genreList"></datalist>
+  </section>
+
+  <!-- Player -->
+  <section class="card">
+    <h2>🎛️ DJ Booth</h2>
+    <div class="row">
+      <select id="deviceSelect" style="flex:1"><option value="">Connect Spotify to see devices</option></select>
+      <button id="refreshDevices" class="small" title="Refresh devices">↻</button>
+    </div>
+    <p class="muted" style="margin:6px 0 12px" id="deviceHint">Play in this browser, or pick a phone / car / speaker that has Spotify open.</p>
+
+    <div class="row">
+      <label class="muted" for="mixSize">Songs per mix</label>
+      <select id="mixSize">
+        <option>15</option><option selected>25</option><option>40</option>
+      </select>
+      <div class="spacer"></div>
+      <button id="buildBtn" class="primary">🎲 Build mix &amp; play</button>
+    </div>
+
+    <div style="margin-top:14px" class="now" id="now">
+      <img id="nowArt" alt="">
+      <div style="min-width:0">
+        <div class="title" id="nowTitle">Nothing playing</div>
+        <div class="muted" id="nowArtist">Build a mix to start the trip.</div>
+        <div id="nowWho"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="prevBtn" disabled>⏮</button>
+      <button id="toggleBtn" disabled>⏯ Play / Pause</button>
+      <button id="nextBtn" disabled>⏭ Skip</button>
+      <button id="moreBtn" disabled>➕ Add 10 more</button>
+    </div>
+    <div class="status" id="playerStatus"></div>
+  </section>
+
+  <!-- Queue -->
+  <section class="card full">
+    <h2>📜 The Mix</h2>
+    <div class="fair" id="fairness"></div>
+    <ul class="queue" id="queue"></ul>
+    <p class="muted" id="emptyQueue">Your mix will show up here, with whose turn each song is.</p>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   Config & state
+   ============================================================ */
+const SCOPES = [
+  'user-read-playback-state', 'user-modify-playback-state', 'user-read-currently-playing',
+  'streaming', 'user-read-email', 'user-read-private',
+  'playlist-read-private', 'playlist-read-collaborative', 'user-library-read'
+].join(' ');
+// Always the same address (even if opened as /index.html) so it matches the Spotify dashboard exactly
+const REDIRECT_URI = location.origin + location.pathname.replace(/index\.html$/, '');
+const COLORS = ['#1db954', '#ffb547', '#5ab0ff', '#ff6fa8', '#b18cff', '#4fe0d0', '#ff8a4c', '#e3e36b'];
+const GENRES = ['pop', 'rock', 'indie', 'indie rock', 'indie pop', 'alternative', 'hip hop', 'rap', 'r&b', 'soul',
+  'funk', 'disco', 'country', 'folk', 'americana', 'bluegrass', 'blues', 'jazz', 'classical', 'electronic', 'edm',
+  'house', 'techno', 'drum and bass', 'dubstep', 'ambient', 'lo-fi', 'metal', 'heavy metal', 'punk', 'pop punk',
+  'emo', 'grunge', 'classic rock', 'hard rock', 'reggae', 'reggaeton', 'latin', 'k-pop', 'j-pop', 'afrobeats',
+  'dancehall', 'gospel', 'singer-songwriter', 'synthwave', 'new wave', 'motown', 'surf rock', 'psychedelic rock',
+  'trap', 'grime', 'shoegaze', 'bossa nova', 'salsa', 'yacht rock', 'soft rock', 'outlaw country', 'chillwave'];
+
+const state = {
+  passengers: JSON.parse(localStorage.getItem('rtdj_passengers') || '[]')
+    .map(p => ({ playlists: [], ...p })),   // older saves had genres only
+  mix: [],              // [{uri,id,name,artists,art,pid,genre(label)}]
+  usedIds: new Set(),
+  turn: 0,              // rotating passenger index
+  pools: {},            // genre -> {tracks:[], total:null, fallback:false, offsets:Set}
+  playlistPools: {},    // playlist id -> {tracks:[], failed:false} (whole playlist, shuffled)
+  myPlaylists: [],      // [{id,name}] from the logged-in account
+  deviceId: null,
+  sdkPlayer: null,
+  sdkDeviceId: null,
+  currentId: null,
+  playingOurMix: false,
+  extending: false,
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const savePassengers = () => localStorage.setItem('rtdj_passengers', JSON.stringify(state.passengers));
+const status = (el, msg, err = false) => { $(el).textContent = msg || ''; $(el).classList.toggle('err', !!err); };
+
+/* ============================================================
+   Spotify auth (Authorization Code + PKCE, no server needed)
+   ============================================================ */
+const tok = {
+  get access() { return localStorage.getItem('rtdj_access'); },
+  get refresh() { return localStorage.getItem('rtdj_refresh'); },
+  get expires() { return +localStorage.getItem('rtdj_expires') || 0; },
+  save(t) {
+    localStorage.setItem('rtdj_access', t.access_token);
+    if (t.refresh_token) localStorage.setItem('rtdj_refresh', t.refresh_token);
+    localStorage.setItem('rtdj_expires', Date.now() + (t.expires_in - 60) * 1000);
+    if (t.scope) localStorage.setItem('rtdj_scope', t.scope);
+  },
+  get hasPlaylistAccess() { return (localStorage.getItem('rtdj_scope') || '').includes('playlist-read-private'); },
+  clear() { ['rtdj_access', 'rtdj_refresh', 'rtdj_expires', 'rtdj_scope'].forEach(k => localStorage.removeItem(k)); }
+};
+
+function randomString(len) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  return Array.from(crypto.getRandomValues(new Uint8Array(len)), b => chars[b % chars.length]).join('');
+}
+async function sha256b64url(str) {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function login() {
+  const clientId = $('clientId').value.trim();
+  if (!clientId) return status('setupStatus', 'Paste your Client ID first.', true);
+  localStorage.setItem('rtdj_client', clientId);
+  const verifier = randomString(64);
+  const st = randomString(16);
+  sessionStorage.setItem('rtdj_verifier', verifier);
+  sessionStorage.setItem('rtdj_state', st);
+  const params = new URLSearchParams({
+    client_id: clientId, response_type: 'code', redirect_uri: REDIRECT_URI, scope: SCOPES,
+    code_challenge_method: 'S256', code_challenge: await sha256b64url(verifier), state: st,
+  });
+  location.href = 'https://accounts.spotify.com/authorize?' + params;
+}
+
+async function tokenRequest(body) {
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error || 'Token request failed');
+  tok.save(data);
+}
+
+async function handleRedirect() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('code') && !q.has('error')) return;
+  history.replaceState(null, '', location.pathname);
+  if (q.get('error')) return status('setupStatus', 'Spotify said: ' + q.get('error'), true);
+  if (q.get('state') !== sessionStorage.getItem('rtdj_state')) return status('setupStatus', 'Login state mismatch, please try again.', true);
+  try {
+    await tokenRequest({
+      grant_type: 'authorization_code', code: q.get('code'), redirect_uri: REDIRECT_URI,
+      client_id: localStorage.getItem('rtdj_client'), code_verifier: sessionStorage.getItem('rtdj_verifier'),
+    });
+  } catch (e) { status('setupStatus', 'Login failed: ' + e.message, true); }
+}
+
+async function getToken() {
+  if (!tok.access) return null;
+  if (Date.now() > tok.expires && tok.refresh) {
+    try {
+      await tokenRequest({ grant_type: 'refresh_token', refresh_token: tok.refresh, client_id: localStorage.getItem('rtdj_client') });
+    } catch { tok.clear(); updateAuthUI(); return null; }
+  }
+  return tok.access;
+}
+
+async function api(path, opts = {}, retry = true) {
+  const token = await getToken();
+  if (!token) throw new Error('Not connected to Spotify');
+  const res = await fetch('https://api.spotify.com/v1' + path, {
+    ...opts, headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (res.status === 401 && retry) { localStorage.setItem('rtdj_expires', 0); return api(path, opts, false); }
+  if (res.status === 429 && retry) {
+    await new Promise(r => setTimeout(r, (+res.headers.get('Retry-After') || 2) * 1000));
+    return api(path, opts, false);
+  }
+  if (res.status === 204 || res.status === 202) return null;
+  const text = await res.text();
+  // Player endpoints (play, queue, next…) sometimes answer with a non-JSON body; treat that as "no data"
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!res.ok) throw new Error(data?.error?.message || (text && text.length < 200 ? text : 'Spotify error ' + res.status));
+  return data;
+}
+
+/* ============================================================
+   Passengers UI
+   ============================================================ */
+function renderPassengers() {
+  const wrap = $('passengers');
+  $('noPassengers').classList.toggle('hidden', state.passengers.length > 0);
+  wrap.innerHTML = state.passengers.map(p => `
+    <div class="passenger" style="--pc:${p.color}" data-id="${p.id}">
+      <div class="top">
+        <span class="dot"></span>
+        <span class="name">${esc(p.name)}</span>
+        <button class="small ghost" data-act="remove" title="Remove passenger">✕</button>
+      </div>
+      <div class="chips">
+        ${p.genres.map((g, i) => `<span class="chip">${esc(g)}<button data-act="delgenre" data-i="${i}" title="Remove">×</button></span>`).join('')}
+        ${p.playlists.map((pl, i) => `<span class="chip pl">${pl.id === 'liked' ? '❤️' : '🎵'} ${esc(pl.name)}<button data-act="delpl" data-i="${i}" title="Remove">×</button></span>`).join('')}
+        ${!p.genres.length && !p.playlists.length ? '<span class="muted">No genres or playlists yet</span>' : ''}
+      </div>
+      <form class="row" data-act="addgenre">
+        <input list="genreList" placeholder="Add a genre (e.g. indie rock)" maxlength="40">
+        <button class="small" type="submit">Add</button>
+      </form>
+      ${playlistPickerHtml()}
+    </div>`).join('');
+  renderFairness();
+}
+
+function playlistPickerHtml() {
+  if (!tok.access) return '<p class="muted pick-note">Connect Spotify to add playlists too.</p>';
+  if (!tok.hasPlaylistAccess) return '<p class="muted pick-note">Reconnect Spotify (top of page) to add playlists.</p>';
+  return `<select class="pl-pick" data-act="addpl">
+      <option value="">🎵 Add a playlist…</option>
+      <option value="liked">❤️ Liked Songs</option>
+      ${state.myPlaylists.map(pl => `<option value="${esc(pl.id)}">${esc(pl.name)}</option>`).join('')}
+      <option value="link">🔗 Paste a playlist link…</option>
+    </select>`;
+}
+
+// Accepts https://open.spotify.com/playlist/ID?si=…, spotify:playlist:ID, or a bare ID
+function parsePlaylistId(text) {
+  const m = String(text).trim().match(/(?:playlist[/:])([A-Za-z0-9]{22})/) || String(text).trim().match(/^([A-Za-z0-9]{22})$/);
+  return m ? m[1] : null;
+}
+
+$('passengers').addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-act="addpl"]');
+  if (!sel || !sel.value) return;
+  const p = state.passengers.find(x => x.id === sel.closest('.passenger').dataset.id);
+  let id = sel.value, name;
+  if (id === 'link') {
+    id = parsePlaylistId(prompt('Paste a Spotify playlist link:') || '');
+    if (!id) { sel.value = ''; return status('playerStatus', "That doesn't look like a Spotify playlist link.", true); }
+    name = state.myPlaylists.find(pl => pl.id === id)?.name;
+    if (!name) {
+      try { name = (await api(`/playlists/${id}?fields=name`))?.name; } catch { /* name is optional */ }
+    }
+  } else {
+    name = id === 'liked' ? 'Liked Songs' : state.myPlaylists.find(pl => pl.id === id)?.name;
+  }
+  if (!p.playlists.some(pl => pl.id === id)) p.playlists.push({ id, name: name || 'Playlist' });
+  savePassengers(); renderPassengers();
+});
+
+$('addPassengerForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('passengerName').value.trim();
+  if (!name) return;
+  const used = new Set(state.passengers.map(p => p.color));
+  const color = COLORS.find(c => !used.has(c)) || COLORS[state.passengers.length % COLORS.length];
+  state.passengers.push({ id: crypto.randomUUID(), name, color, genres: [], playlists: [] });
+  $('passengerName').value = '';
+  savePassengers(); renderPassengers();
+  document.querySelector(`.passenger[data-id="${state.passengers.at(-1).id}"] input`)?.focus();
+});
+
+$('passengers').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const p = state.passengers.find(x => x.id === btn.closest('.passenger').dataset.id);
+  if (btn.dataset.act === 'remove') state.passengers = state.passengers.filter(x => x !== p);
+  if (btn.dataset.act === 'delgenre') p.genres.splice(+btn.dataset.i, 1);
+  if (btn.dataset.act === 'delpl') p.playlists.splice(+btn.dataset.i, 1);
+  savePassengers(); renderPassengers();
+});
+
+$('passengers').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const p = state.passengers.find(x => x.id === form.closest('.passenger').dataset.id);
+  const g = form.querySelector('input').value.trim().toLowerCase();
+  if (g && !p.genres.includes(g)) p.genres.push(g);
+  savePassengers(); renderPassengers();
+  document.querySelector(`.passenger[data-id="${p.id}"] input`)?.focus();
+});
+
+$('genreList').innerHTML = GENRES.map(g => `<option value="${g}">`).join('');
+
+/* ============================================================
+   Mix building: take turns between passengers, random genre each turn
+   ============================================================ */
+async function fetchGenrePage(genre) {
+  const pool = state.pools[genre] ||= { tracks: [], total: null, fallback: false, offsets: new Set() };
+  const LIMIT = 10;
+  // Stay within the more popular results so songs are road-trip friendly
+  const maxOffset = pool.total == null ? 0 : Math.max(0, Math.min(pool.total, 250) - LIMIT);
+  let offset = 0;
+  for (let tries = 0; tries < 8; tries++) {
+    offset = Math.floor(Math.random() * (maxOffset / LIMIT + 1)) * LIMIT;
+    if (!pool.offsets.has(offset)) break;
+  }
+  pool.offsets.add(offset);
+  const q = pool.fallback ? genre : `genre:"${genre}"`;
+  const data = await api(`/search?${new URLSearchParams({ q, type: 'track', limit: LIMIT, offset, market: 'from_token' })}`);
+  const items = (data?.tracks?.items || []).filter(Boolean);
+  pool.total = data?.tracks?.total ?? 0;
+  if (!items.length && !pool.fallback) {
+    // Genre tag unknown to Spotify: fall back to a plain keyword search
+    pool.fallback = true; pool.total = null; pool.offsets.clear();
+    return fetchGenrePage(genre);
+  }
+  pool.tracks.push(...items.sort(() => Math.random() - 0.5));
+  return items.length;
+}
+
+async function nextTrackForGenre(genre) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (!state.pools[genre]?.tracks.length) {
+      const got = await fetchGenrePage(genre);
+      if (!got) return null;
+    }
+    const p = state.pools[genre];
+    while (p.tracks.length) {
+      const t = p.tracks.shift();
+      // avoid repeats and back-to-back songs by the same artist
+      const lastArtist = state.mix.at(-1)?.artistIds?.[0];
+      if (!state.usedIds.has(t.id) && t.artists[0]?.id !== lastArtist) return t;
+    }
+  }
+  return null;
+}
+
+/* ---------- Playlists & Liked Songs ---------- */
+const stripBase = (url) => url.replace('https://api.spotify.com/v1', '');
+
+async function loadMyPlaylists() {
+  if (!tok.hasPlaylistAccess) return;
+  const out = [];
+  let path = '/me/playlists?limit=50';
+  try {
+    while (path && out.length < 300) {
+      const data = await api(path);
+      out.push(...(data?.items || []).filter(Boolean).map(pl => ({ id: pl.id, name: pl.name })));
+      path = data?.next ? stripBase(data.next) : null;
+    }
+  } catch (e) { status('playerStatus', 'Could not load your playlists: ' + e.message, true); }
+  state.myPlaylists = out;
+  renderPassengers();
+}
+
+// Reads the whole playlist once (up to 600 songs), then deals them out shuffled
+async function loadPlaylistPool(id) {
+  const pool = state.playlistPools[id] = { tracks: [], failed: false };
+  const firstPaths = id === 'liked'
+    ? ['/me/tracks?limit=50&market=from_token']
+    : [`/playlists/${id}/items?limit=50&market=from_token`, `/playlists/${id}/tracks?limit=50&market=from_token`];
+  let lastErr;
+  for (const first of firstPaths) {
+    try {
+      let path = first;
+      while (path && pool.tracks.length < 600) {
+        const data = await api(path);
+        for (const it of data?.items || []) {
+          const t = it?.track || it?.item;   // field name differs between endpoint versions
+          if (t && t.type === 'track' && t.id && !t.is_local && t.is_playable !== false) pool.tracks.push(t);
+        }
+        path = data?.next ? stripBase(data.next) : null;
+      }
+      lastErr = null;
+      break;
+    } catch (e) { lastErr = e; pool.tracks = []; }
+  }
+  if (lastErr || !pool.tracks.length) {
+    pool.failed = true;
+    const name = state.passengers.flatMap(p => p.playlists).find(pl => pl.id === id)?.name || 'that playlist';
+    state.warning = `Skipped “${name}”: Spotify only lets apps read playlists you made or follow, not Spotify's own editorial ones.`;
+  }
+  pool.tracks.sort(() => Math.random() - 0.5);
+}
+
+async function nextTrackFromPlaylist(id) {
+  if (!state.playlistPools[id]) await loadPlaylistPool(id);
+  const pool = state.playlistPools[id];
+  const lastArtist = state.mix.at(-1)?.artistIds?.[0];
+  // prefer a different artist than the last song, but don't insist if the playlist is one-artist heavy
+  let i = pool.tracks.findIndex(t => !state.usedIds.has(t.id) && t.artists[0]?.id !== lastArtist);
+  if (i < 0) i = pool.tracks.findIndex(t => !state.usedIds.has(t.id));
+  return i < 0 ? null : pool.tracks.splice(i, 1)[0];
+}
+
+/* ---------- Taking turns ---------- */
+function sourcesFor(p) {
+  return [
+    ...p.genres.map(g => ({ type: 'genre', key: g, label: g })),
+    ...p.playlists.filter(pl => !state.playlistPools[pl.id]?.failed)
+      .map(pl => ({ type: 'playlist', key: pl.id, label: (pl.id === 'liked' ? '❤️ ' : '🎵 ') + pl.name })),
+  ];
+}
+
+async function extendMix(count) {
+  const riders = () => state.passengers.filter(p => sourcesFor(p).length);
+  if (!riders().length) throw new Error('Give at least one passenger a genre or a playlist first.');
+  const added = [];
+  for (let i = 0; i < count; i++) {
+    const list = riders();
+    if (!list.length) break;
+    const p = list[state.turn % list.length];
+    state.turn++;
+    // try this passenger's sources in random order until one gives a fresh song
+    const sources = sourcesFor(p).sort(() => Math.random() - 0.5);
+    let t = null, src = null;
+    for (src of sources) {
+      status('playerStatus', `Finding a song from ${src.label} for ${p.name}… (${i + 1}/${count})`);
+      t = src.type === 'genre' ? await nextTrackForGenre(src.key) : await nextTrackFromPlaylist(src.key);
+      if (t) break;
+    }
+    if (!t) continue;
+    const imgs = t.album?.images || [];
+    const entry = {
+      uri: t.uri, id: t.id, name: t.name, artists: t.artists.map(a => a.name).join(', '),
+      artistIds: t.artists.map(a => a.id),
+      art: (imgs.at(-1) || imgs[0] || {}).url || '', pid: p.id, genre: src.label,
+    };
+    state.usedIds.add(t.id);
+    state.mix.push(entry);
+    added.push(entry);
+    renderQueue();
+  }
+  status('playerStatus', state.warning || '', !!state.warning);
+  return added;
+}
+
+/* ============================================================
+   Playback
+   ============================================================ */
+async function buildAndPlay() {
+  const btn = $('buildBtn');
+  btn.disabled = true;
+  try {
+    if (!state.deviceId) throw new Error('Pick a playback device first (open Spotify on your phone or use this browser).');
+    state.sdkPlayer?.activateElement?.(); // lets the browser player start audio after this click
+    state.mix = []; state.usedIds.clear(); state.turn = 0; state.currentId = null;
+    state.playlistPools = {};   // re-read playlists so a new mix can use every song again
+    state.warning = null;
+    renderQueue();
+    await extendMix(+$('mixSize').value);
+    if (!state.mix.length) throw new Error('No songs found. Try more common genres or a different playlist.');
+    await api(`/me/player/play?device_id=${encodeURIComponent(state.deviceId)}`, {
+      method: 'PUT', body: JSON.stringify({ uris: state.mix.map(t => t.uri) }),
+    });
+    state.playingOurMix = true;
+    setControls(true);
+    if (state.warning) status('playerStatus', '🎶 Mix is playing. ' + state.warning, true);
+    else status('playerStatus', '🎶 Mix is playing. Enjoy the drive!');
+    state.warning = null;
+    setTimeout(pollPlayback, 1200);
+  } catch (e) {
+    status('playerStatus', e.message, true);
+  } finally { btn.disabled = false; }
+}
+
+async function addMore(n = 10) {
+  if (state.extending) return;
+  state.extending = true;
+  $('moreBtn').disabled = true;
+  try {
+    const added = await extendMix(n);
+    for (const t of added) {
+      await api(`/me/player/queue?${new URLSearchParams({ uri: t.uri, device_id: state.deviceId })}`, { method: 'POST' });
+    }
+    status('playerStatus', `Added ${added.length} more songs to the queue.`);
+  } catch (e) { status('playerStatus', e.message, true); }
+  finally { state.extending = false; $('moreBtn').disabled = false; }
+}
+
+function setControls(on) { ['prevBtn', 'toggleBtn', 'nextBtn', 'moreBtn'].forEach(id => $(id).disabled = !on); }
+
+async function control(fn) {
+  try { await fn(); setTimeout(pollPlayback, 600); } catch (e) { status('playerStatus', e.message, true); }
+}
+$('nextBtn').onclick = () => control(() => api('/me/player/next', { method: 'POST' }));
+$('prevBtn').onclick = () => control(() => api('/me/player/previous', { method: 'POST' }));
+$('toggleBtn').onclick = () => control(async () => {
+  const s = await api('/me/player');
+  await api(s?.is_playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' });
+});
+$('moreBtn').onclick = () => addMore(10);
+$('buildBtn').onclick = buildAndPlay;
+
+async function pollPlayback() {
+  if (!tok.access) return;
+  let s;
+  try { s = await api('/me/player'); } catch { return; }
+  const item = s?.item;
+  if (!item) return;
+  $('nowArt').src = (item.album?.images?.[1] || item.album?.images?.[0] || {}).url || '';
+  $('nowTitle').textContent = item.name;
+  $('nowArtist').textContent = item.artists?.map(a => a.name).join(', ') || '';
+  const entry = state.mix.find(t => t.id === item.id);
+  const p = entry && state.passengers.find(x => x.id === entry.pid);
+  $('nowWho').innerHTML = p
+    ? `<span class="badge" style="--pc:${p.color}"><span class="dot"></span>${esc(p.name)}'s pick · ${esc(entry.genre)}</span>`
+    : '';
+  if (state.mix.length) setControls(true);
+  if (item.id !== state.currentId) { state.currentId = item.id; renderQueue(); }
+  // Keep the party going: top up when we're near the end of the mix
+  const idx = state.mix.findIndex(t => t.id === item.id);
+  if (state.playingOurMix && idx >= 0 && state.mix.length - idx <= 3) addMore(10);
+}
+setInterval(pollPlayback, 4000);
+// Coming back from the Spotify app (or unlocking the phone): refresh right away
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && tok.access) { loadDevices(); pollPlayback(); }
+});
+
+/* ============================================================
+   Devices + Web Playback SDK ("This browser")
+   ============================================================ */
+async function loadDevices() {
+  const sel = $('deviceSelect');
+  try {
+    const data = await api('/me/player/devices');
+    const devices = data?.devices || [];
+    if (!devices.length) {
+      sel.innerHTML = '<option value="">No devices — open Spotify on a phone/computer, then ↻</option>';
+      state.deviceId = null; return;
+    }
+    const preferred = state.deviceId || devices.find(d => d.is_active)?.id || state.sdkDeviceId || devices[0].id;
+    sel.innerHTML = devices.map(d =>
+      `<option value="${esc(d.id)}" ${d.id === preferred ? 'selected' : ''}>${d.id === state.sdkDeviceId ? '💻 This browser' : (d.type === 'Smartphone' ? '📱 ' : '🔊 ') + esc(d.name)}${d.is_active ? ' (active)' : ''}</option>`
+    ).join('');
+    state.deviceId = sel.value;
+  } catch (e) { status('playerStatus', e.message, true); }
+}
+$('deviceSelect').onchange = () => { state.deviceId = $('deviceSelect').value || null; };
+$('refreshDevices').onclick = loadDevices;
+
+// Phone browsers can't play Spotify inside a web page, so on phones we drive the Spotify app instead
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+function loadSdk() {
+  if (IS_MOBILE) {
+    $('deviceHint').textContent = 'Open the Spotify app on this phone (play any song for a second), come back, then tap ↻ and pick it.';
+    return;
+  }
+  window.onSpotifyWebPlaybackSDKReady = () => {
+    const player = new Spotify.Player({
+      name: 'Chopped & Shuffled', volume: 0.8,
+      getOAuthToken: async (cb) => cb(await getToken()),
+    });
+    player.addListener('ready', ({ device_id }) => { state.sdkDeviceId = device_id; setTimeout(loadDevices, 800); });
+    player.addListener('account_error', () => status('playerStatus', 'Browser playback needs Spotify Premium — you can still pick another device.', true));
+    player.addListener('authentication_error', ({ message }) => console.warn('SDK auth:', message));
+    player.addListener('player_state_changed', () => setTimeout(pollPlayback, 300));
+    player.connect();
+    state.sdkPlayer = player;
+  };
+  const s = document.createElement('script');
+  s.src = 'https://sdk.scdn.co/spotify-player.js';
+  document.body.appendChild(s);
+}
+
+/* ============================================================
+   Queue rendering
+   ============================================================ */
+function renderQueue() {
+  const curIdx = state.mix.findIndex(t => t.id === state.currentId);
+  $('emptyQueue').classList.toggle('hidden', state.mix.length > 0);
+  $('queue').innerHTML = state.mix.map((t, i) => {
+    const p = state.passengers.find(x => x.id === t.pid) || { name: '?', color: '#888' };
+    const cls = i === curIdx ? 'playing' : (curIdx >= 0 && i < curIdx ? 'played' : '');
+    return `<li class="${cls}" style="--pc:${p.color}">
+      <img src="${esc(t.art)}" alt="">
+      <div class="meta"><div class="t">${i === curIdx ? '▶ ' : ''}${esc(t.name)}</div><div class="a">${esc(t.artists)}</div></div>
+      <div class="who"><span class="dot"></span> ${esc(p.name)}<br>${esc(t.genre)}</div>
+    </li>`;
+  }).join('');
+  document.querySelector('.queue li.playing')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  renderFairness();
+}
+
+function renderFairness() {
+  if (!state.mix.length) { $('fairness').innerHTML = ''; return; }
+  $('fairness').innerHTML = state.passengers.map(p => {
+    const n = state.mix.filter(t => t.pid === p.id).length;
+    return `<span style="--pc:${p.color}"><span class="dot"></span>${esc(p.name)}: ${n} song${n === 1 ? '' : 's'}</span>`;
+  }).join('');
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+function updateAuthUI() {
+  const on = !!tok.access;
+  $('authPill').textContent = on ? '● Connected to Spotify' : 'Not connected';
+  $('authPill').classList.toggle('ok', on);
+  $('logoutBtn').classList.toggle('hidden', !on);
+  // Logins from before playlists were added lack the playlist permissions: ask to reconnect once
+  const needsReconnect = on && !tok.hasPlaylistAccess;
+  $('setupCard').classList.toggle('hidden', on && !needsReconnect);
+  $('setupSteps').classList.toggle('hidden', needsReconnect);
+  $('loginBtn').textContent = needsReconnect ? 'Reconnect Spotify' : 'Connect Spotify';
+  if (needsReconnect) status('setupStatus', 'New feature: playlists! Reconnect once so Spotify lets the app read your playlists and Liked Songs.');
+  $('buildBtn').disabled = !on;
+}
+$('loginBtn').onclick = login;
+$('logoutBtn').onclick = () => { tok.clear(); state.sdkPlayer?.disconnect(); location.reload(); };
+
+(async function init() {
+  $('redirectUri').textContent = REDIRECT_URI;
+  $('clientId').value = localStorage.getItem('rtdj_client') || '';
+  renderPassengers(); renderQueue();
+  await handleRedirect();
+  updateAuthUI();
+  if (tok.access) {
+    try {
+      const me = await api('/me');
+      $('authPill').textContent = '● ' + (me.display_name || 'Connected');
+      if (me.product && me.product !== 'premium') status('playerStatus', 'Heads up: controlling playback needs Spotify Premium.', true);
+    } catch (e) { status('playerStatus', e.message, true); }
+    loadSdk();
+    loadDevices();
+    loadMyPlaylists();
+    pollPlayback();
+  }
+  renderPassengers();
+})();
+</script>
+</body>
+</html>
