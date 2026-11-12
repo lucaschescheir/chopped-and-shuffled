@@ -20,7 +20,9 @@
   header p { margin: 0; color: var(--muted); }
   .spacer { flex: 1; }
   main { max-width: 1100px; margin: 0 auto; padding: 12px 20px 60px; display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+  main > * { min-width: 0; }            /* stop long text (e.g. device names) from widening the page on phones */
+  select { max-width: 100%; text-overflow: ellipsis; }
   .card { background: var(--panel); border: 1px solid #262a33; border-radius: var(--radius); padding: 18px; }
   .card h2 { margin: 0 0 12px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
   .full { grid-column: 1 / -1; }
@@ -153,7 +155,7 @@
     </div>
     <div class="status" id="playerStatus"></div>
     <div id="appFallback" class="app-fallback hidden">
-      <div class="muted">Not playing on your phone? Send the mix straight to the Spotify app instead. It saves to a private playlist called <b>Chopped &amp; Shuffled</b> (reused every time).</div>
+      <div class="muted">Easiest on a phone: send the mix straight to the Spotify app and press play there. It saves to a private playlist called <b>Chopped &amp; Shuffled</b> (reused every time).</div>
       <div class="row" style="margin-top:8px">
         <button id="saveToAppBtn" class="primary">📲 Send mix to Spotify app</button>
         <a id="openInAppLink" class="btn-link primary hidden" target="_blank" rel="noopener">▶ Open in Spotify</a>
@@ -551,19 +553,24 @@ async function extendMix(count) {
 /* ============================================================
    Playback
    ============================================================ */
+// Start a fresh mix (used by both "Build mix & play" and "Send mix to Spotify app")
+async function newMix() {
+  state.mix = []; state.usedIds.clear(); state.turn = 0; state.currentId = null;
+  state.playlistPools = {};   // re-read playlists so a new mix can use every song again
+  state.appPlaylistId = null; $('openInAppLink').classList.add('hidden');
+  state.warning = null;
+  renderQueue();
+  await extendMix(+$('mixSize').value);
+  if (!state.mix.length) throw new Error('No songs found. Try more common genres or a different playlist.');
+}
+
 async function buildAndPlay() {
   const btn = $('buildBtn');
   btn.disabled = true;
   try {
     if (!state.deviceId) throw new Error('Pick a playback device first (open Spotify on your phone or use this browser).');
     state.sdkPlayer?.activateElement?.(); // lets the browser player start audio after this click
-    state.mix = []; state.usedIds.clear(); state.turn = 0; state.currentId = null;
-    state.playlistPools = {};   // re-read playlists so a new mix can use every song again
-    state.appPlaylistId = null; $('openInAppLink').classList.add('hidden');
-    state.warning = null;
-    renderQueue();
-    await extendMix(+$('mixSize').value);
-    if (!state.mix.length) throw new Error('No songs found. Try more common genres or a different playlist.');
+    await newMix();
     const deviceName = $('deviceSelect').selectedOptions[0]?.textContent.replace(' (active)', '') || 'your device';
     status('playerStatus', `Starting the mix on ${deviceName}…`);
     const started = await startOnDevice(state.deviceId);
@@ -659,11 +666,11 @@ async function playlistItems(id, method, uris) {
 // Save the mix to one reusable private playlist and offer a link that opens it in the Spotify app
 async function sendMixToApp() {
   const btn = $('saveToAppBtn');
-  if (!state.mix.length) return status('playerStatus', 'Build a mix first.', true);
   if (!tok.hasAllScopes) { updateAuthUI(); return status('playerStatus', 'Reconnect Spotify (top of page) first so the app can save playlists.', true); }
   btn.disabled = true;
-  status('playerStatus', 'Saving the mix to your Chopped & Shuffled playlist…');
   try {
+    if (!state.mix.length) await newMix();   // no mix yet: build one first
+    status('playerStatus', 'Saving the mix to your Chopped & Shuffled playlist…');
     const uris = state.mix.map(t => t.uri);
     let id = localStorage.getItem('rtdj_mix_playlist');
     if (id) {
@@ -853,6 +860,8 @@ function updateAuthUI() {
   $('loginBtn').textContent = needsReconnect ? 'Reconnect Spotify' : 'Connect Spotify';
   if (needsReconnect) status('setupStatus', 'New features need one more permission: reconnect once so the app can read your playlists and save the mix to a playlist for the Spotify app.');
   $('buildBtn').disabled = !on;
+  // Phones: always offer the Spotify-app route, it's the most reliable there
+  if (IS_MOBILE && on) $('appFallback').classList.remove('hidden');
 }
 $('loginBtn').onclick = login;
 $('logoutBtn').onclick = () => { tok.clear(); state.sdkPlayer?.disconnect(); location.reload(); };
